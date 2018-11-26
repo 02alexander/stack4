@@ -5,15 +5,22 @@ ring.src = "static/ring.png";
 let kryss = document.createElement("img");
 kryss.src = "static/kryss.png";
 
+var gameIsOver = false;
+
 function localGame() {
 	gameArea.start();
 	stack4.start();
 	stack4.renderLines();
 
 	stack4.renderBoard();
-	stack4.highlightAccecpableMoves();
+	//stack4.highlightAccecpableMoves();
 
 	window.addEventListener('mousedown', function(e) {
+
+		if (gameIsOver) {
+			return;
+		}
+
 		let rect = gameArea.canvas.getBoundingClientRect();
 		let x = e.clientX - rect.left;
 		let y = e.clientY - rect.top;
@@ -23,15 +30,39 @@ function localGame() {
 		console.log(boardCordy);
 		console.log("\n");
 		stack4.placePiece(boardCordx,boardCordy);
+		stack4.renderBoard();
+		let wn = stack4.hasWon(1);
+		if (wn[0]) {
+			console.log("\nring");
+			console.log("start (" + wn[1] + ", " + wn[2] + ")");
+			console.log("end (" + wn[3] + ", " + wn[4] + ")");
+			let start = stack4.getRect(wn[1], wn[2]);
+			let startx = start.x + start.w/2;
+			let starty = start.y + start.h/2;
 
-		if (stack4.hasWon(1)) {
-			console.log("ring vann");
-		} else if (stack4.hasWon(2)) {
-			console.log("kryss vann");
+			let end = stack4.getRect(wn[3], wn[4]);
+			let endx = end.x + end.w/2;
+			let endy = end.y + end.h/2;
+			gameArea.drawLine(startx, starty, endx, endy);
+			gameIsOver = true;
+		}
+		wn = stack4.hasWon(2);
+		if (wn[0]) {
+			console.log("\nkryss");
+			console.log("start (" + wn[1] + ", " + wn[2] + ")");
+			console.log("end (" + wn[3] + ", " + wn[4] + ")");
+			let start = stack4.getRect(wn[1], wn[2]);
+			let startx = start.x + start.w/2;
+			let starty = start.y + start.h/2;
+
+			let end = stack4.getRect(wn[3], wn[4]);
+			let endx = end.x + end.w/2;
+			let endy = end.y + end.h/2;
+			gameArea.drawLine(startx, starty, endx, endy);
+			gameIsOver = true;
 		}
 
-		stack4.renderBoard();
-		stack4.highlightAccecpableMoves();
+		//stack4.highlightAccecpableMoves();
 	});
 
 }
@@ -47,6 +78,15 @@ var gameArea = {
 	clear: function() {
 		this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
 	},
+	drawLine: function(x1, y1, x2, y2) {
+		let ctx = this.context;
+		ctx.strokeStyle= "green";
+		ctx.fillStyle = "green";
+		ctx.beginPath();
+		ctx.moveTo(x1,y1);
+		ctx.lineTo(x2,y2);
+		ctx.stroke();
+	}
 }
 
 var stack4 = {
@@ -86,19 +126,8 @@ var stack4 = {
 				if (img == undefined) {
 					continue;
 				} 
-				let width = gameArea.canvas.width/9-lineThicknes;
-				if (xCord == 8) {
-					width -= lineThicknes;
-				}
-				let height = gameArea.canvas.height/9-lineThicknes;
-				if (yCord == 8) {
-					height -= lineThicknes;
-				}
-				gameArea.context.drawImage(img, 
-										   xCord*(gameArea.canvas.width/9)+lineThicknes,
-										   yCord*(gameArea.canvas.height/9)+lineThicknes,
-										   width,
-										   height);
+				let rect = this.getRect(xCord, yCord);
+				gameArea.context.drawImage(img, rect.x, rect.y, rect.w, rect.h);
 			}
 		}
 	},
@@ -119,6 +148,21 @@ var stack4 = {
 		}
 		return null;
 	},
+	getRect: function(xCord, yCord) {
+		let width = gameArea.canvas.width/9-lineThicknes;
+		let height = gameArea.canvas.height/9-lineThicknes;
+		if (xCord === 8) {
+			width -= lineThicknes;
+		}
+		if (yCord === 8) {
+			height -= lineThicknes;
+		}
+		return { x: xCord*(gameArea.canvas.width/9)+lineThicknes, 
+				 y: yCord*(gameArea.canvas.height/9)+lineThicknes,
+				 w: width,
+				 h: height };
+	},
+
 	highlightAccecpableMoves: function() {
 		for (let xCord = 0; xCord < 9; ++xCord) {
 			for (let yCord = 0; yCord < 9; ++yCord) {
@@ -148,23 +192,27 @@ var stack4 = {
 		}
 	},
 	hasWon: function(player) {
-		let directions = [[0,1], [1,1], [1,0]];
-		for (let x = 0; x < 5; ++x) {
-			for (let y = 0; y < 5; ++y) {
-				for (let dir = 0; dir < 3; ++dir) {
+		let directions = [[0,1], [1,1], [1,0], [-1,1]];
+		for (let x = 0; x < 9; ++x) {
+			for (let y = 0; y < 9; ++y) {
+				for (let dir = 0; dir < 4; ++dir) {
 					let isBroken = false;
-					for (let c = 0; c < 4; ++c) {
+					for (var c = 0; c < 4; ++c) {
+						if (!(x+c*directions[dir][0]>=0 && x+c*directions[dir][0]<9 && y+c*directions[dir][1]>=0 && y+c*directions[dir][1]<9)) {
+							isBroken = true;
+							continue;
+						}
 						if (this.board[x+c*directions[dir][0]][y+c*directions[dir][1]] !== player) {
 							isBroken = true;
 						}
 					}
 					if (isBroken === false) {
-						return true;
+						return [true, x, y, x+(c-1)*directions[dir][0],y+(c-1)*directions[dir][1]];
 					}
 				}
 			}
 		}
-		return false;
+		return [false, null, null];
 	}
 }
 
